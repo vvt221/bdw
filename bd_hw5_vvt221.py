@@ -8,6 +8,7 @@ Original file is located at
 """
 
 from pyspark import SparkContext
+import sys
 sc = SparkContext()
 
 
@@ -25,6 +26,7 @@ def createIndex(shapefile):
     import rtree
     import fiona.crs
     import geopandas as gpd
+    # neighborhood_shp = sc.textFile(shapefile)
     zones = gpd.read_file(shapefile).to_crs(fiona.crs.from_epsg(2263))
     index = rtree.Rtree()
     for idx,geometry in enumerate(zones.geometry):
@@ -47,7 +49,7 @@ def processTrips(pid, records):
     import shapely.geometry as geom
     
     proj = pyproj.Proj(init="epsg:2263", preserve_units=True)    
-    index, zones = createIndex('/content/spatialindex-src-1.8.5/neighborhoods.geojson')   
+    index, zones = createIndex(file_1)   
     
     
     if pid==0:
@@ -56,21 +58,30 @@ def processTrips(pid, records):
     counts = {}
     
     for row in reader:
-
-        p = geom.Point(proj(float(row[3]), float(row[2])))
-        zone = findZone(p, index, zones)
-        if zone:
-            counts[zone] = counts.get(zone, 0) + 1
+        #try:
+        #print(row[5])
+        if len(row) == 18:
+           p = geom.Point(proj(float(row[5]), float(row[6])))
+           zone = findZone(p, index, zones)
+           if zone:
+              counts[zone] = counts.get(zone,0) + 1
+   
+        #except ValueError:
+            ##print(row[3], row[2])
+        #zone = findZone(p, index, zones)
+        #if zone:
+        #    counts[zone] = counts.get(zone, 0) + 1
     return counts.items()
             
 
     
     
     
-file_1 = 'hdfs:///tmp/bdm/neighborhoods.geojson'
-file_2 = 'hdfs:///tmp/bdm/yellow_tripdata_2011-05.csv.gz'
+file_1 = "neighborhoods.geojson"
+file_2 = sys.argv[1]
+print(file_2)
 
-    
+index,zones = createIndex(file_1)  
 boro_neigh  = mapBoroNeigh(file_1)
 boro_neigh_rdd = sc.parallelize(boro_neigh)
 rdd = sc.textFile(file_2)
